@@ -299,7 +299,7 @@ func (o *redhat) scanUnsecurePackagesUsingYumCheckUpdate() (CvePacksList, error)
 	// get Updateble package name, installed, candidate version.
 	packInfoList, err := o.parseYumCheckUpdateLines(r.Stdout)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse %s. err: %s", cmd, err)
+		return nil, fmt.Errorf("(1)Failed to parse %s. err: %s", cmd, err)
 	}
 	o.log.Debugf("%s", pp.Sprintf("%v", packInfoList))
 
@@ -407,10 +407,20 @@ func (o *redhat) parseYumCheckUpdateLines(stdout string) (results models.Package
 		// update information of packages begin after blank line.
 		if trimed := strings.TrimSpace(line); len(trimed) == 0 {
 			needToParse = true
+			o.log.Debug("needToParse = true")
 			continue
 		}
 		if needToParse {
 			if strings.HasPrefix(line, "Obsoleting") {
+				continue
+			}
+			if strings.HasPrefix(line, "パッケージを不要にしています") {
+				// fedora 23 dirty hack.
+				continue
+			}
+			if strings.HasPrefix(line, "Last metadata expiration check") {
+				o.log.Debug("=== Last metadata expiration check ===")
+				// fedora 23 dirty hack.
 				continue
 			}
 			candidate, err := o.parseYumCheckUpdateLine(line)
@@ -436,7 +446,7 @@ func (o *redhat) parseYumCheckUpdateLines(stdout string) (results models.Package
 func (o *redhat) parseYumCheckUpdateLine(line string) (models.PackageInfo, error) {
 	fields := strings.Fields(line)
 	if len(fields) != 3 {
-		return models.PackageInfo{}, fmt.Errorf("Unknown format: %s", line)
+		return models.PackageInfo{}, fmt.Errorf("(1)Unknown format: %s", line)
 	}
 	splitted := strings.Split(fields[0], ".")
 	packName := ""
@@ -448,7 +458,7 @@ func (o *redhat) parseYumCheckUpdateLine(line string) (models.PackageInfo, error
 
 	fields = strings.Split(fields[1], "-")
 	if len(fields) != 2 {
-		return models.PackageInfo{}, fmt.Errorf("Unknown format: %s", line)
+		return models.PackageInfo{}, fmt.Errorf("(2)Unknown format: %s", line)
 	}
 	version := fields[0]
 	release := fields[1]
@@ -525,7 +535,7 @@ func (o *redhat) scanUnsecurePackagesUsingYumPluginSecurity() (CvePacksList, err
 	}
 	updatable, err := o.parseYumCheckUpdateLines(r.Stdout)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse %s. err: %s", cmd, err)
+		return nil, fmt.Errorf("(2)Failed to parse %s. err: %s", cmd, err)
 	}
 	o.log.Debugf("%s", pp.Sprintf("%v", updatable))
 

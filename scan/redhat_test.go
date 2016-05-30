@@ -646,6 +646,100 @@ python-libs.i686    2.6.6-64.el6   rhui-REGION-rhel-server-releases
 	}
 }
 
+func TestParseYumCheckUpdateLinesFedora23(t *testing.T) {
+	r := newRedhat(config.ServerInfo{})
+	r.Family = "fedora"
+	stdout := `Yum command has been deprecated, redirecting to '/usr/bin/dnf --color=never check-update'.
+See 'man dnf' and 'man yum2dnf' for more information.
+To transfer transaction metadata from yum to DNF, run:
+'dnf install python-dnf-plugins-extras-migrate && dnf-2 migrate'
+
+Last metadata expiration check: 1:06:45 ago on Mon May  9 15:09:15 2016.
+
+audit-libs.x86_64              2.3.7-5.el6                   base
+bash.x86_64                    4.1.2-33.el6_7.1              updates
+Obsoleting Packages
+python-libs.i686    2.6.6-64.el6   rhui-REGION-rhel-server-releases
+    python-ordereddict.noarch     1.1-3.el6ev    installed
+`
+
+	r.Packages = []models.PackageInfo{
+		{
+			Name:    "audit-libs",
+			Version: "2.3.6",
+			Release: "4.el6",
+		},
+		{
+			Name:    "bash",
+			Version: "4.1.1",
+			Release: "33",
+		},
+		{
+			Name:    "python-libs",
+			Version: "2.6.0",
+			Release: "1.1-0",
+		},
+		{
+			Name:    "python-ordereddict",
+			Version: "1.0",
+			Release: "1",
+		},
+	}
+	var tests = []struct {
+		in  string
+		out models.PackageInfoList
+	}{
+		{
+			stdout,
+			models.PackageInfoList{
+				{
+					Name:       "audit-libs",
+					Version:    "2.3.6",
+					Release:    "4.el6",
+					NewVersion: "2.3.7",
+					NewRelease: "5.el6",
+				},
+				{
+					Name:       "bash",
+					Version:    "4.1.1",
+					Release:    "33",
+					NewVersion: "4.1.2",
+					NewRelease: "33.el6_7.1",
+				},
+				{
+					Name:       "python-libs",
+					Version:    "2.6.0",
+					Release:    "1.1-0",
+					NewVersion: "2.6.6",
+					NewRelease: "64.el6",
+				},
+				{
+					Name:       "python-ordereddict",
+					Version:    "1.0",
+					Release:    "1",
+					NewVersion: "1.1",
+					NewRelease: "3.el6ev",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		packInfoList, err := r.parseYumCheckUpdateLines(tt.in)
+		if err != nil {
+			t.Errorf("Error has occurred, err: %s\ntt.in: %v", err, tt.in)
+			return
+		}
+		for i, ePackInfo := range tt.out {
+			if !reflect.DeepEqual(ePackInfo, packInfoList[i]) {
+				e := pp.Sprintf("%v", ePackInfo)
+				a := pp.Sprintf("%v", packInfoList[i])
+				t.Errorf("[%d] expected %s, actual %s", i, e, a)
+			}
+		}
+	}
+}
+
 func TestParseYumCheckUpdateLinesAmazon(t *testing.T) {
 	r := newRedhat(config.ServerInfo{})
 	r.Family = "amzon"
